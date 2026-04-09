@@ -9,7 +9,8 @@ namespace WpfApp1
         {
             {"for", 1},
             {"in", 2},
-            {"range", 3}
+            {"range", 3},
+            {"print", 4}
         };
 
         private static readonly Dictionary<int, string> TypeNames = new Dictionary<int, string>
@@ -17,6 +18,7 @@ namespace WpfApp1
             {1, "ключевое слово (for)"},
             {2, "ключевое слово (in)"},
             {3, "ключевое слово (range)"},
+            {4, "ключевое слово (print)"},
             {10, "идентификатор"},
             {20, "целое число"},
             {30, "оператор присваивания (=)"},
@@ -37,11 +39,13 @@ namespace WpfApp1
             {61, "запятая (,)"},
             {62, "открывающая скобка (()"},
             {63, "закрывающая скобка ())"},
+            {64, "точка с запятой (;)"},
             {90, "недопустимый символ"}
         };
 
         public List<Lexem> Analyze(string text)
         {
+
             var result = new List<Lexem>();
             if (string.IsNullOrEmpty(text)) return result;
 
@@ -52,6 +56,8 @@ namespace WpfApp1
 
             while (idx < len)
             {
+                int startPos = pos;
+
                 char ch = text[idx];
 
                 if (ch == '\n')
@@ -70,7 +76,6 @@ namespace WpfApp1
 
                 if (ch == ' ' || ch == '\t')
                 {
-                    int startPos = pos;
                     var sb = new StringBuilder();
                     while (idx < len && (text[idx] == ' ' || text[idx] == '\t'))
                     {
@@ -84,7 +89,6 @@ namespace WpfApp1
 
                 if (char.IsDigit(ch))
                 {
-                    int startPos = pos;
                     var sb = new StringBuilder();
                     while (idx < len && char.IsDigit(text[idx]))
                     {
@@ -98,7 +102,6 @@ namespace WpfApp1
 
                 if (char.IsLetter(ch) || ch == '_')
                 {
-                    int startPos = pos;
                     var sb = new StringBuilder();
                     while (idx < len && (char.IsLetterOrDigit(text[idx]) || text[idx] == '_'))
                     {
@@ -140,9 +143,30 @@ namespace WpfApp1
                     continue;
                 }
 
-                result.Add(CreateLexem(90, ch.ToString(), line, pos, pos, isError: true));
-                idx++;
-                pos++;
+                var errorValue = new StringBuilder();
+                while (idx < len)
+                {
+                    char cur = text[idx];
+                    bool isValidStart = false;
+                    if (cur == ' ' || cur == '\t' || cur == '\n' || cur == '\r')
+                        isValidStart = true;
+                    else if (char.IsDigit(cur))
+                        isValidStart = true;
+                    else if (char.IsLetter(cur) || cur == '_')
+                        isValidStart = true;
+                    else if (GetSingleCharOperatorCode(cur) != -1)
+                        isValidStart = true;
+                    else if (idx + 1 < len && GetTwoCharOperatorCode(text.Substring(idx, 2)) != -1)
+                        isValidStart = true;
+
+                    if (isValidStart)
+                        break;
+
+                    errorValue.Append(cur);
+                    idx++;
+                    pos++;
+                }
+                result.Add(CreateLexem(90, errorValue.ToString(), line, startPos, pos - 1, isError: true));
             }
 
             return result;
@@ -176,6 +200,7 @@ namespace WpfApp1
                 case ',': return 61;
                 case '(': return 62;
                 case ')': return 63;
+                case ';': return 64;
                 default: return -1;
             }
         }
